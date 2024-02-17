@@ -15,5 +15,7 @@ val colorsMap = mapOf(
     "blue" to "#0000FF",
     "yellow" to "#FFFF00",
     "cyan" to "#00FFFF",
-    "magenta" to "#FF00FF"
+    "magenta" to "#FF00FF",
+    "gray" to "#808080",
+    "coffee" to "#6F4E37"
 )

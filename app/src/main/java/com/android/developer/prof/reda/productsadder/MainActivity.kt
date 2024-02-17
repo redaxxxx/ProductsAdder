@@ -6,23 +6,30 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.text.TextUtils
 import android.util.Log
 import android.util.TypedValue
 import android.view.View
+import android.widget.Toast
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isEmpty
 import androidx.databinding.DataBindingUtil
+import androidx.lifecycle.lifecycleScope
 import com.android.developer.prof.reda.productsadder.databinding.ActivityMainBinding
 import com.google.android.material.chip.Chip
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.io.ByteArrayOutputStream
 import java.util.Collections
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -56,16 +63,90 @@ class MainActivity : AppCompatActivity() {
 
         setSizeChips()
         setColorChips()
+
+        binding.addProductBtn.setOnClickListener {
+            if (productValidation()){
+                saveProduct {
+                    Log.d("Save Product", it.toString())
+                }
+            }
+        }
     }
 
-    private fun saveProduct(){
+    private fun saveProduct(state: (Boolean)-> Unit){
+        val imagesBytesArrays = getImagesBytesArrays()
+        val sizes = sizeList
+        val colors = colorList
+        val productName = binding.productNameEditText.text?.trim().toString()
+        val images = mutableListOf<String>()
+        val productCategory = binding.productCategoryEditText.text?.trim().toString()
+        val productDescription = binding.productDescriptionEditText.text?.trim().toString()
+        val productPrice = binding.productPriceEditText.text?.trim().toString()
+        val productOffer = binding.productOfferEditText.text?.trim().toString()
 
+        lifecycleScope.launch {
+            showLoading()
+            try {
+                async {
+                    imagesBytesArrays.forEach {
+                        val id = UUID.randomUUID().toString()
+                        launch {
+                            val imagesStorage = firebaseStorage.child("products/images/$id")
+                            val result = imagesStorage.putBytes(it).await()
+                            val downloadUrl = result.storage.downloadUrl.await().toString()
+                            images.add(downloadUrl)
+                        }
+                    }
+                }.await()
+            }catch (e: Exception){
+                hideLoading()
+                state(false)
+                e.printStackTrace()
+            }
+
+            val product = Product(
+                UUID.randomUUID().toString(),
+                productName,
+                productCategory,
+                productPrice.toFloat(),
+                if (productOffer.isEmpty()) null else productOffer.toFloat(),
+                productDescription,
+                colors,
+                sizes,
+                images
+            )
+
+            firesotre.collection("products").add(product)
+                .addOnSuccessListener {
+                    state(true)
+
+                    binding.productNameEditText.text?.clear()
+                    binding.productCategoryEditText.text?.clear()
+                    binding.productPriceEditText.text?.clear()
+                    binding.productOfferEditText.text?.clear()
+                    binding.productDescriptionEditText.text?.clear()
+                    imgList.clear()
+                    colorList.clear()
+                    sizeList.clear()
+                    binding.addImagesProductRv.adapter = null
+                    binding.addSizeChipGroup.clearCheck()
+                    binding.addColorChipGroup.clearCheck()
+                    hideLoading()
+                }
+                .addOnFailureListener{
+                    Log.d("Save Product", it.message.toString())
+                    state(false)
+                    hideLoading()
+                }
+        }
     }
 
     private fun showLoading(){
+        binding.progressBarFrame.visibility = View.VISIBLE
         binding.progressCircular.visibility = View.VISIBLE
     }
     private fun hideLoading(){
+        binding.progressBarFrame.visibility = View.GONE
         binding.progressCircular.visibility = View.GONE
     }
 
@@ -73,16 +154,25 @@ class MainActivity : AppCompatActivity() {
         if(imgList.isEmpty()){
             return false
         }
-        if (binding.productNameOutlinedTextLayout.isEmpty()){
+        if (colorList.isEmpty()){
+            return false
+        }
+        if (sizeList.isEmpty()){
+            return false
+        }
+        if (TextUtils.isEmpty(binding.productNameEditText.text)){
             binding.productNameOutlinedTextLayout.error = "Product Name cannot be empty"
+            binding.productNameOutlinedTextLayout.isErrorEnabled = true
             return false
         }
-        if (binding.productCategoryOutlinedTextLayout.isEmpty()){
+        if (TextUtils.isEmpty(binding.productCategoryEditText.text)){
             binding.productCategoryOutlinedTextLayout.error = "Product category cannot be empty"
+            binding.productCategoryOutlinedTextLayout.isErrorEnabled = true
             return false
         }
-        if (binding.productDescriptionOutlinedTextLayout.isEmpty()){
-            binding.productDescriptionOutlinedTextLayout.error = "Product description cannot be empty"
+        if (TextUtils.isEmpty(binding.productNameEditText.text)){
+            binding.productPriceOutlinedTextLayout.error = "Product price cannot be empty"
+            binding.productNameOutlinedTextLayout.isErrorEnabled = true
             return false
         }
 

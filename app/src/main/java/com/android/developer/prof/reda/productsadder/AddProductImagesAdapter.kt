@@ -24,7 +24,6 @@ class AddProductImagesAdapter(): ListAdapter<Uri, AddProductImagesAdapter.Produc
                 binding.addImageView.setImageURI(imgUrl)
             }
         }
-
     }
 
     companion object DiffCallback: DiffUtil.ItemCallback<Uri>(){
@@ -49,13 +48,5 @@ class AddProductImagesAdapter(): ListAdapter<Uri, AddProductImagesAdapter.Produc
         val imgUrl = getItem(position)
         holder.bind(imgUrl)
 
-
-
     }
-
-    class OnClickListener(val clickListener: (imgUrl: Uri) -> Unit){
-        fun onDelete(imgUrl: Uri) = clickListener(imgUrl)
-    }
-
-
 }
